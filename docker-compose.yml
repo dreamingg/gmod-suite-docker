@@ -1,0 +1,76 @@
+services:
+
+  # -
+  # Database & PHPMyAdmin
+
+  db:
+    image: mariadb
+    container_name: db
+    restart: always
+    secrets:
+      - db-password
+    volumes:
+      - db-data:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: dreamin
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db-password
+    expose:
+      - 3306
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    restart: always
+    secrets:
+      - db-password
+    depends_on:
+      - db
+    links:
+      - db
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD_FILE: /run/secrets/db-password
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+    expose:
+      - 80
+      - 443
+    ports:
+      - "8080:80"
+      - "8443:443"
+
+  # -
+  # Garry's Mod Server
+
+  gmod:
+    build:
+      context: ./gmod
+      dockerfile: ubuntu20-gmod-${CPU_ARCH:-i384}.Dockerfile
+    ports:
+      - "${PORT:-27015}:27015"
+      - "${PORT:-27015}:27015/udp"
+      - "27005:27005/udp"
+    tty: true # Server wont start without this
+    stdin_open: true
+    volumes:
+      - gmod-data:/home/gsrv/gmod-data
+    secrets:
+      - db-password
+    depends_on:
+      - db
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+
+volumes:
+  db-data:
+  gmod-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${GMOD_MOUNT_DIR}
+      o: bind
+
+secrets:
+  db-password:
+    file: db/password
